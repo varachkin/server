@@ -1,9 +1,16 @@
 const express = require('express');
 const WebSocket = require('ws');
 const http = require('http');
+const cors = require('cors'); // Add this line
 
 const app = express();
 const server = http.createServer(app);
+app.options('*', cors());
+app.use(cors({
+    origin: '*', // For development, replace with your frontend URL in production
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type']
+}));
 
 // Create WebSocket server
 const wss = new WebSocket.Server({ server });
