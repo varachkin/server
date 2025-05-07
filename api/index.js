@@ -1,10 +1,12 @@
 const express = require('express');
 const WebSocket = require('ws');
 const http = require('http');
-const cors = require('cors'); // Add this line
+const cors = require('cors');
 
 const app = express();
 const server = http.createServer(app);
+
+// CORS configuration
 app.options('*', cors());
 app.use(cors({
     origin: '*', // For development, replace with your frontend URL in production
@@ -21,6 +23,13 @@ const clients = new Set();
 // Handle WebSocket connections
 wss.on('connection', (ws) => {
     clients.add(ws);
+
+    // Send immediate timestamp on new connection
+    ws.send(JSON.stringify({
+        subject: 'time',
+        message: new Date().toISOString(),
+        info: 'Welcome! Time updates will be sent every 10 seconds'
+    }));
 
     ws.on('close', () => {
         clients.delete(ws);
@@ -43,7 +52,8 @@ app.post('/api/message', (req, res) => {
         if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({
                 subject: 'test',
-                message: message
+                message: message,
+                timestamp: new Date().toISOString()
             }));
         }
     });
@@ -51,19 +61,34 @@ app.post('/api/message', (req, res) => {
     res.json({ success: true });
 });
 
-// Send time updates every 10 seconds
-setInterval(() => {
-    const timeMessage = JSON.stringify({
+// Time broadcast function
+function broadcastTime() {
+    const timeMessage = {
         subject: 'time',
-        message: new Date().toISOString()
-    });
+        message: 'Server time update',
+        timestamp: new Date().toISOString(),
+        interval: '10 seconds'
+    };
 
     clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
-            client.send(timeMessage);
+            client.send(JSON.stringify(timeMessage));
         }
     });
-}, 10000);
+
+    console.log(`Broadcasted time update at ${timeMessage.timestamp}`);
+}
+
+// Send initial time message immediately
+broadcastTime();
+
+// Set up the 10-second interval
+const timeInterval = setInterval(broadcastTime, 10000);
+
+// Clean up interval when server closes
+server.on('close', () => {
+    clearInterval(timeInterval);
+});
 
 // Handle both HTTP and WebSocket on the same port
 module.exports = server;
